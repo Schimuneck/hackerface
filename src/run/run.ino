@@ -5,10 +5,17 @@ Hackerface team
 #define ML_PWM 5   //define PWM control pin of B motor
 #define MR_Ctrl 2    //define direction control pin of A motor
 #define MR_PWM 9   //define PWM control pin of A motor
+#define SCL_Pin  A5  //Set clock pin to A5
+#define SDA_Pin  A4  //Set data pin to A4
 int BLE_val;
 int BT_Serial_Iter = 7;
 int BT_Serial_Vals[] = {0, 0, 0, 0, 0, 0, 0};
- 
+
+unsigned char data[] =
+{
+0x00, 0x78, 0x10, 0x20, 0x78, 0x00, 0x3e, 0x0a, 0x42, 0x40, 0x7d, 0x00, 0x3e, 0x0a, 0x02, 0x00
+};
+
 void setup()
 {
   Serial.begin(9600);
@@ -16,11 +23,14 @@ void setup()
   pinMode(ML_PWM, OUTPUT);//set PWM control pin of B motor to OUTPUT
   pinMode(MR_Ctrl, OUTPUT);//set direction control pin of A motor to OUTPUT
   pinMode(MR_PWM, OUTPUT);//Set PWM control pin of A motor to OUTPUT
+  pinMode(SCL_Pin,OUTPUT);
+  pinMode(SDA_Pin,OUTPUT);
 }
 
 void loop()
 {
   readBTInput();
+  matrix_display(data);
 }
 
 void readBTInput() {
@@ -149,3 +159,62 @@ void stopped()
   analogWrite(ML_PWM,0);//set PWM control speed of B motor to 0
   analogWrite(MR_PWM,0);//set PWM control speed of A motor to 0
 }
+
+//this function is used for dot matrix display
+void matrix_display(unsigned char matrix_value[])
+{
+  IIC_start();  //the function to call the data transmission
+  IIC_send(0xc0);  //Select address
+  
+  for(int i = 0;i < 16;i++) //Pattern data has 16 bytes
+  {
+     IIC_send(matrix_value[i]); //data to convey patterns
+  }
+  IIC_end();   //end the transmission of patterns data
+  IIC_start();
+  IIC_send(0x8A);  //display control, set pulse width to 4/16
+  IIC_end();
+}
+//  the condition that data transmission starts
+void IIC_start()
+{
+  digitalWrite(SCL_Pin,HIGH);
+  delayMicroseconds(3);
+  digitalWrite(SDA_Pin,HIGH);
+  delayMicroseconds(3);
+  digitalWrite(SDA_Pin,LOW);
+  delayMicroseconds(3);
+}
+// transmit data
+void IIC_send(unsigned char send_data)
+{
+  for(char i = 0;i < 8;i++)  //Every character has 8 bits
+  {
+      digitalWrite(SCL_Pin,LOW);  //pull down the SCL_Pin to change the signal of SDA
+      delayMicroseconds(3);
+      if(send_data & 0x01)  //1 or 0 of byte  is used to set high and low level of SDA_Pin
+      {
+        digitalWrite(SDA_Pin,HIGH);
+      }
+      else
+      {
+        digitalWrite(SDA_Pin,LOW);
+      }
+      delayMicroseconds(3);
+      digitalWrite(SCL_Pin,HIGH); //Pull up SCL_Pin to stop data transmission
+      delayMicroseconds(3);
+      send_data = send_data >> 1;  //Detect bit by bit, so move the data right by one bit
+  }
+}
+//the sign that data transmission ends 
+void IIC_end()
+{
+  digitalWrite(SCL_Pin,LOW);
+  delayMicroseconds(3);
+  digitalWrite(SDA_Pin,LOW);
+  delayMicroseconds(3);
+  digitalWrite(SCL_Pin,HIGH);
+  delayMicroseconds(3);
+  digitalWrite(SDA_Pin,HIGH);
+  delayMicroseconds(3);
+}//****************************************************************************************
